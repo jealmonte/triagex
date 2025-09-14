@@ -1,0 +1,107 @@
+/* Import Tailwind and animation plugin */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Custom CSS variables (colors, fonts, etc.) */
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #f2f2f2;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #000000;
+  --muted: #404040;
+  --muted-foreground: #f2f2f2;
+  --accent: #8b5cf6;
+  --accent-foreground: #ffffff;
+  --destructive: #d97706;
+  --destructive-foreground: #ffffff;
+  --border: #ffffff;
+  --input: #f2f2f2;
+  --ring: #8b5cf6;
+  --radius: 0.5rem;
+  --sidebar: #000000;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #8b5cf6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f2f2f2;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #ffffff;
+  --sidebar-ring: #8b5cf6;
+  --font-instrument-serif: "Instrument Serif", serif;
+  --font-figtree: "Figtree", sans-serif;
+}
+
+/* Dark mode override */
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #1a1a1a;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --primary: #7c3aed;
+  --primary-foreground: #000000;
+  --secondary: #262626;
+  --secondary-foreground: #ffffff;
+  --muted: #333333;
+  --muted-foreground: #7c3aed;
+  --accent: #7c3aed;
+  --accent-foreground: #000000;
+  --destructive: #b45309;
+  --destructive-foreground: #ffffff;
+  --border: #333333;
+  --input: #262626;
+  --ring: #7c3aed;
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #7c3aed;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #262626;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #333333;
+  --sidebar-ring: #7c3aed;
+  --font-instrument-serif: "Instrument Serif", serif;
+  --font-figtree: "Figtree", sans-serif;
+}
+
+/* Keyframes for floating images */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Base styles using Tailwind utilities in JSX, not CSS! */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-figtree);
+}
+
+/* Font override for instrument class */
+.instrument {
+  font-family: var(--font-instrument-serif);
+}
+
+/* You can add other truly custom styles below as needed,
+   but DO NOT use @apply, @theme, @layer, or @custom-variant in this file!
+*/
+
+/* Example: Image floating effect for a specific class */
+.image-rapid-triage-kit {
+  animation: float 3s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Smooth scroll for entire document (optional) */
+html {
+  scroll-behavior: smooth;
+}
