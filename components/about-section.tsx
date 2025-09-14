@@ -8,7 +8,7 @@ export default function AboutSection() {
           TriageX
         </h2>
         <p className="text-lg font-light text-white/80 max-w-2xl mx-auto">
-          Revolutionizing emergency medical response with AI-powered triage technology
+          Faster triage. Smarter care. Empowering every responder when it matters most.
         </p>
       </div>
 
@@ -30,14 +30,7 @@ export default function AboutSection() {
               Mission
             </h3>
             <p className="text-white/80 font-light leading-relaxed mb-6">
-              TriageX addresses the urgent need for speed, precision, and reliability in emergency medical triage by
-              equipping first responders with an advanced AI-powered diagnostic device. Traditional triage methods are
-              often slow, prone to human error, and struggle to keep up during high-volume incidents—delaying life-saving
-              interventions and accurate prioritization.
-            </p>
-            <p className="text-white/80 font-light leading-relaxed">
-              With TriageX, emergency responders can deliver the decisive, data-driven care patients need—when every
-              second counts.
+              Our mission is to ensure that every second counts in emergency care by putting advanced, affordable AI triage technology into the hands of every responder—anywhere. TriageX bridges the gap between chaos and clarity, providing instant, hospital-grade decision support on the spot. By prioritizing both speed and universal access, we empower teams to save more lives, reach every patient faster, and bring equitable, life-saving care to communities everywhere.
             </p>
           </div>
         </div>
@@ -59,19 +52,27 @@ export default function AboutSection() {
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
                 <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-white/80 font-light">Rugged, handheld kit with intuitive yes/no health questions</p>
+                <p className="text-white/80 font-light">
+                  Engineered to thrive in harsh environments, TriageX keeps things simple under pressure. Intuitive yes/no prompts make triage smooth for any responder—no medical expertise required—so care isn’t slowed by confusion or stress.
+                </p>
               </div>
               <div className="flex items-start space-x-3">
                 <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-white/80 font-light">Integrated vital sign sensors with on-device AI</p>
+                <p className="text-white/80 font-light">
+                  Real-time, high-accuracy sensing meets advanced AI. Instantly capture and analyze vital metrics on the spot, delivering evidence-driven decisions—even with no internet. Every reading empowers better outcomes, even on the go.
+                </p>
               </div>
               <div className="flex items-start space-x-3">
                 <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-white/80 font-light">Rapid, evidence-based risk assessments—instantly and offline</p>
+                <p className="text-white/80 font-light">
+                  TriageX delivers critical, hospital-level assessment in mere seconds and works anywhere. Offline capability ensures life-saving insights are always available, letting responders act faster when it matters most.
+                </p>
               </div>
               <div className="flex items-start space-x-3">
                 <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p className="text-white/80 font-light">Streamlined communication between EMS and hospitals</p>
+                <p className="text-white/80 font-light">
+                  Seamless wireless connectivity bridges the field and the ER. Share vital data instantly to ensure hospitals are ready for incoming patients, shrinking the gap between patient need and prepared hospital teams.
+                </p>
               </div>
             </div>
           </div>
