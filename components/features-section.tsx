@@ -25,12 +25,12 @@ export default function FeaturesSection() {
 
         {/* Main product image + feature boxes */}
         <div className="flex justify-center items-center">
-          <div className="relative w-[220px] h-[300px] sm:w-[400px] sm:h-[600px] md:w-[600px] md:h-[800px]">
+          <div className="relative w-[220px] h-[300px] sm:w-[400px] sm:h-[600px] md:w-[450px] md:h-[600px]">
             <Image
               src="/images/rapid-triage-kit.png"
               alt="Rapid Triage Kit - Emergency Medical Device"
               fill
-              sizes="(max-width: 640px) 220px, (max-width: 1024px) 400px, 600px"
+              sizes="(max-width: 640px) 220px, (max-width: 1024px) 400px, 450px"
               className="object-contain max-w-full h-auto relative z-10"
               priority
               style={{
@@ -38,9 +38,10 @@ export default function FeaturesSection() {
               }}
             />
 
+
             {/* Desktop floating feature boxes */}
             <div className="hidden sm:block">
-              <div className="absolute -top-4 -left-2 sm:-top-6 sm:-left-24 bg-gray-500/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 sm:p-6 max-w-[140px] sm:max-w-xs shadow-md sm:shadow-2xl transition-all duration-300 hover:border-white/50 hover:shadow-lg sm:hover:shadow-white/20 z-20 text-xs sm:text-base">
+              <div className="absolute -top-4 -left-2 sm:-top-6 sm:-left-50 bg-gray-500/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 sm:p-6 max-w-[140px] sm:max-w-xs shadow-md sm:shadow-2xl transition-all duration-300 hover:border-white/50 hover:shadow-lg sm:hover:shadow-white/20 z-20 text-xs sm:text-base">
                 <h3 className="text-white font-semibold text-base sm:text-lg mb-1 sm:mb-3 font-sans">
                   <span className="font-medium italic instrument text-base sm:text-xl inline-block mr-1.5">
                     Rapid
@@ -51,7 +52,7 @@ export default function FeaturesSection() {
                   Advanced algorithms provide instant medical triage decisions in critical situations.
                 </p>
               </div>
-              <div className="absolute top-2/3 -right-24 sm:-right-40 bg-gray-500/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 sm:p-6 max-w-[140px] sm:max-w-xs shadow-md sm:shadow-2xl transition-all duration-300 hover:border-white/50 hover:shadow-lg sm:hover:shadow-white/20 z-20 text-xs sm:text-base">
+              <div className="absolute top-2/3 -right-24 sm:-right-64 bg-gray-500/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 sm:p-6 max-w-[140px] sm:max-w-xs shadow-md sm:shadow-2xl transition-all duration-300 hover:border-white/50 hover:shadow-lg sm:hover:shadow-white/20 z-20 text-xs sm:text-base">
                 <h3 className="text-white font-semibold text-base sm:text-lg mb-1 sm:mb-3 font-sans">
                   <span className="font-medium italic instrument text-base sm:text-xl inline-block mr-1.5">
                     Portable
@@ -62,7 +63,7 @@ export default function FeaturesSection() {
                   Compact, battery-powered device designed for field deployment.
                 </p>
               </div>
-              <div className="absolute top-1/2 -translate-y-1/2 -left-16 sm:-left-72 bg-gray-500/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 sm:p-6 max-w-[140px] sm:max-w-xs shadow-md sm:shadow-2xl transition-all duration-300 hover:border-white/50 hover:shadow-lg sm:hover:shadow-white/20 z-20 text-xs sm:text-base">
+              <div className="absolute top-2/3 -translate-y-1/2 -left-16 sm:-left-70 bg-gray-500/80 backdrop-blur-sm border border-white/20 rounded-lg p-2 sm:p-6 max-w-[140px] sm:max-w-xs shadow-md sm:shadow-2xl transition-all duration-300 hover:border-white/50 hover:shadow-lg sm:hover:shadow-white/20 z-20 text-xs sm:text-base">
                 <h3 className="text-white font-semibold text-base sm:text-lg mb-1 sm:mb-3 font-sans">
                   <span className="font-medium italic instrument text-base sm:text-xl inline-block mr-1.5">
                     Real-time

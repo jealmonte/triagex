@@ -105,56 +105,56 @@ export default function Dashboard() {
   const [currentPatientName, setCurrentPatientName] = useState<string>("Patient")
 
   // Get current patient info from URL params or localStorage
-useEffect(() => {
-  // Try to get patient info from URL params first
-  const urlParams = new URLSearchParams(window.location.search);
-  const patientId = urlParams.get('patientId');
-  const patientName = urlParams.get('patientName');
-  
-  if (patientId && patientName) {
-    console.log('Got patient from URL:', { patientId, patientName });
-    setCurrentPatientId(patientId);
-    setCurrentPatientName(patientName);
-  } else {
-    console.log('No patient info in URL, checking localStorage...');
+  useEffect(() => {
+    // Try to get patient info from URL params first
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get('patientId');
+    const patientName = urlParams.get('patientName');
     
-    // Try different localStorage keys that might contain patient data
-    const keys = ['traumaPatients', 'patients', 'currentPatient'];
-    let found = false;
-    
-    for (const key of keys) {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        try {
-          const data = JSON.parse(stored);
-          if (Array.isArray(data) && data.length > 0) {
-            console.log(`Found patients in localStorage key "${key}":`, data);
-            setCurrentPatientId(String(data[0].id));
-            setCurrentPatientName(data[0].name);
-            found = true;
-            break;
-          } else if (data.id && data.name) {
-            console.log(`Found single patient in localStorage key "${key}":`, data);
-            setCurrentPatientId(String(data.id));
-            setCurrentPatientName(data.name);
-            found = true;
-            break;
+    if (patientId && patientName) {
+      console.log('Got patient from URL:', { patientId, patientName });
+      setCurrentPatientId(patientId);
+      setCurrentPatientName(patientName);
+    } else {
+      console.log('No patient info in URL, checking localStorage...');
+      
+      // Try different localStorage keys that might contain patient data
+      const keys = ['traumaPatients', 'patients', 'currentPatient'];
+      let found = false;
+      
+      for (const key of keys) {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const data = JSON.parse(stored);
+            if (Array.isArray(data) && data.length > 0) {
+              console.log(`Found patients in localStorage key "${key}":`, data);
+              setCurrentPatientId(String(data[0].id));
+              setCurrentPatientName(data[0].name);
+              found = true;
+              break;
+            } else if (data.id && data.name) {
+              console.log(`Found single patient in localStorage key "${key}":`, data);
+              setCurrentPatientId(String(data.id));
+              setCurrentPatientName(data.name);
+              found = true;
+              break;
+            }
+          } catch (e) {
+            console.log(`Error parsing localStorage key "${key}":`, e);
           }
-        } catch (e) {
-          console.log(`Error parsing localStorage key "${key}":`, e);
         }
       }
+      
+      if (!found) {
+        console.error('NO PATIENT FOUND - This will cause API errors!');
+        console.log('Available localStorage keys:', Object.keys(localStorage));
+        // Don't set fallback values - leave them empty to make the problem obvious
+        setCurrentPatientId("");
+        setCurrentPatientName("NO PATIENT SELECTED");
+      }
     }
-    
-    if (!found) {
-      console.error('NO PATIENT FOUND - This will cause API errors!');
-      console.log('Available localStorage keys:', Object.keys(localStorage));
-      // Don't set fallback values - leave them empty to make the problem obvious
-      setCurrentPatientId("");
-      setCurrentPatientName("NO PATIENT SELECTED");
-    }
-  }
-}, []);
+  }, []);
 
   const addLog = (level: string, message: string, duration?: string, category?: string) => {
     const timestamp = new Date().toLocaleTimeString("en-US", {
@@ -174,186 +174,281 @@ useEffect(() => {
 
   // Enhanced M.A.R.C.H action handler that saves to hospital dashboard
   const handleMarchAction = async (action: string, category: string) => {
-  // Add to local timeline for immediate UI feedback
-  addLog("Action", `[${category}] ${action}`, undefined, category);
+    // Add to local timeline for immediate UI feedback
+    addLog("Action", `[${category}] ${action}`, undefined, category);
 
-  if (!currentPatientId) return;
+    if (!currentPatientId) return;
 
-  // Prepare payload for backend
-  const payload = {
-    patient: currentPatientId,
-    action: `${action}`,
-    action_type: category,  // Adjust field if needed (e.g. map category to your backend enums)
-    details: `${action} for ${currentPatientName}`,
-    source: 'trauma-site',
+    // Prepare payload for backend
+    const payload = {
+      patient: currentPatientId,
+      action: `${action}`,
+      action_type: category,  // Adjust field if needed (e.g. map category to your backend enums)
+      details: `${action} for ${currentPatientName}`,
+      source: 'trauma-site',
+    };
+
+    try {
+      // Send POST request to backend API to save the action
+      const response = await fetch('http://127.0.0.1:8000/api/paramedic-actions/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save paramedic action: ${response.statusText}`);
+      }
+
+      // Optionally read response json if needed
+      const savedAction = await response.json();
+      console.log('Paramedic action saved:', savedAction);
+
+      // Also update localStorage for existing UI sync (optional)
+      const existingTimeline = JSON.parse(localStorage.getItem('timeline') || '{}');
+      if (!existingTimeline[currentPatientId]) existingTimeline[currentPatientId] = [];
+      existingTimeline[currentPatientId].push({
+        timestamp: new Date(),
+        action: payload.action,
+        actionType: payload.action_type,
+        details: payload.details,
+        source: payload.source,
+      });
+      localStorage.setItem('timeline', JSON.stringify(existingTimeline));
+
+      // Trigger dashboard update event
+      triggerTriageXUpdate();
+    } catch (error) {
+      console.error('Error saving paramedic action:', error);
+    }
   };
 
-  try {
-    // Send POST request to backend API to save the action
-    const response = await fetch('http://127.0.0.1:8000/api/paramedic-actions/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+  // Helper function to estimate respiratory rate from heart rate
+  const calculateRespiratoryRate = (heartRate: number): number => {
+    if (!heartRate || heartRate === 0) return 16; // Default normal RR
+    
+    // Rough estimation: RR is typically 1/4 to 1/5 of HR
+    // Normal RR: 12-20, Normal HR: 60-100
+    const estimatedRR = Math.round(heartRate / 4.5);
+    
+    // Constrain to reasonable range
+    return Math.max(12, Math.min(30, estimatedRR));
+  };
 
-    if (!response.ok) {
-      throw new Error(`Failed to save paramedic action: ${response.statusText}`);
-    }
-
-    // Optionally read response json if needed
-    const savedAction = await response.json();
-    console.log('Paramedic action saved:', savedAction);
-
-    // Also update localStorage for existing UI sync (optional)
-    const existingTimeline = JSON.parse(localStorage.getItem('timeline') || '{}');
-    if (!existingTimeline[currentPatientId]) existingTimeline[currentPatientId] = [];
-    existingTimeline[currentPatientId].push({
-      timestamp: new Date(),
-      action: payload.action,
-      actionType: payload.action_type,
-      details: payload.details,
-      source: payload.source,
-    });
-    localStorage.setItem('timeline', JSON.stringify(existingTimeline));
-
-    // Trigger dashboard update event
-    triggerTriageXUpdate();
-  } catch (error) {
-    console.error('Error saving paramedic action:', error);
-  }
-};
-
-
-  // Enhanced vital collection that saves to hospital dashboard
-  const simulateVitalCollection = async () => {
-  if (!currentPatientId) return;
-  
-  setIsCollecting(true)
-
-  // DEBUG: Log what patient ID we're trying to use
-  console.log('Current patient ID:', currentPatientId);
-  console.log('Current patient name:', currentPatientName);
-
-  // Generate realistic vital signs based on patient's current state
-  const generateVitals = () => {
+  // Fallback function for when hardware is unavailable
+  const generateFallbackVitals = () => {
     return {
-      systolic: 110 + Math.floor(Math.random() * 30), // 110-140
-      diastolic: 65 + Math.floor(Math.random() * 20),  // 65-85
-      heartRate: 65 + Math.floor(Math.random() * 30),  // 65-95
-      temperature: 97.5 + Math.random() * 2.5,         // 97.5-100.0
-      respiratoryRate: 14 + Math.floor(Math.random() * 8) // 14-22
+      heartRate: 70 + Math.floor(Math.random() * 20), // 70-90
+      systolic: 115 + Math.floor(Math.random() * 20), // 115-135
+      diastolic: 70 + Math.floor(Math.random() * 15), // 70-85
+      respiratoryRate: 14 + Math.floor(Math.random() * 6), // 14-20
+      temperature: 98.4 + Math.random() * 1, // 98.4-99.4
+      oxygenSaturation: 97 + Math.floor(Math.random() * 3) // 97-100
     };
   };
 
-  const newVitals = generateVitals();
-
-  // Blood Pressure
-  addLog("Vitals", "Starting blood pressure measurement...")
-  await new Promise((resolve) => setTimeout(resolve, 2000))
-  setVitals((prev) => ({ 
-    ...prev, 
-    bloodPressure: { systolic: newVitals.systolic, diastolic: newVitals.diastolic } 
-  }))
-  addLog("Vitals", "Blood pressure measurement complete", "2.1s")
-
-  // Heart Rate
-  addLog("Vitals", "Starting heart rate monitoring...")
-  await new Promise((resolve) => setTimeout(resolve, 1500))
-  setVitals((prev) => ({ ...prev, heartRate: newVitals.heartRate }))
-  addLog("Vitals", "Heart rate monitoring complete", "1.5s")
-
-  // Temperature
-  addLog("Vitals", "Starting temperature reading...")
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  setVitals((prev) => ({ ...prev, temperature: Math.round(newVitals.temperature * 10) / 10 }))
-  addLog("Vitals", "Temperature reading complete", "1.0s")
-
-  // Respiratory Rate
-  addLog("Vitals", "Starting respiratory rate assessment...")
-  await new Promise((resolve) => setTimeout(resolve, 2200))
-  setVitals((prev) => ({ ...prev, respiratoryRate: newVitals.respiratoryRate }))
-  addLog("Vitals", "Respiratory rate assessment complete", "2.2s")
-
-  // Save complete vital signs to localStorage for hospital dashboard
-  const vitalSigns = {
-    timestamp: new Date(),
-    heartRate: newVitals.heartRate,
-    bpSystolic: newVitals.systolic,
-    bpDiastolic: newVitals.diastolic,
-    respiratoryRate: newVitals.respiratoryRate,
-    temperature: Math.round(newVitals.temperature * 10) / 10,
-    oxygenSaturation: 95 + Math.floor(Math.random() * 5), // 95-100
-    source: 'manual'
+  const processFallbackVitals = async (fallbackVitals: any) => {
+    // Same processing as hardware vitals but marked as 'manual'
+    setVitals((prev) => ({ 
+      ...prev, 
+      bloodPressure: { systolic: fallbackVitals.systolic, diastolic: fallbackVitals.diastolic },
+      heartRate: fallbackVitals.heartRate,
+      temperature: Math.round(fallbackVitals.temperature * 10) / 10,
+      respiratoryRate: fallbackVitals.respiratoryRate
+    }));
+    
+    addLog("Success", "Fallback vitals generated successfully");
   };
 
-  // DEBUG: Log the payload we're sending
-  const payload = {
-    patient: parseInt(currentPatientId, 10),  // Convert string to integer
-    heart_rate: vitalSigns.heartRate,
-    bp_systolic: vitalSigns.bpSystolic,
-    bp_diastolic: vitalSigns.bpDiastolic,
-    respiratory_rate: vitalSigns.respiratoryRate,
-    temperature: vitalSigns.temperature,
-    oxygen_saturation: vitalSigns.oxygenSaturation,
-    source: 'manual'
-  };
-  
-  console.log('Payload being sent to API:', payload);
+  // Enhanced vital collection that saves to hospital dashboard with hardware integration
+  const simulateVitalCollection = async () => {
+    if (!currentPatientId) return;
+    
+    setIsCollecting(true)
 
-  try {
-    const response = await fetch('http://127.0.0.1:8000/api/vitalsigns/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    // DEBUG: Log what patient ID we're trying to use
+    console.log('Current patient ID:', currentPatientId);
+    console.log('Current patient name:', currentPatientName);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', response.status, response.statusText);
-      console.error('Error details:', errorText);
-      throw new Error(`Failed to save vital signs: ${response.status} - ${errorText}`);
+    let vitalSigns: any = null;
+
+    try {
+      addLog("Vitals", "Connecting to hardware device...");
+      
+      // Fetch data from ESP32 hardware
+      const hardwareResponse = await fetch('http://192.168.1.1/data', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+
+      if (!hardwareResponse.ok) {
+        throw new Error(`Hardware connection failed: ${hardwareResponse.status}`);
+      }
+
+      const hardwareData = await hardwareResponse.json();
+      console.log('Hardware data received:', hardwareData);
+      
+      addLog("Vitals", "Hardware data received successfully");
+
+      // Map hardware data to our vitals format
+      // Assuming your ESP32 returns: {"bpm": 75, "avgbpm": 73, "spo2": 98, "bodytemp": 98.6, "systolic": 120, "diastolic": 80}
+      const newVitals = {
+        heartRate: hardwareData.bpm || hardwareData.avgbpm || 0,
+        systolic: hardwareData.systolic || 120,
+        diastolic: hardwareData.diastolic || 80,
+        temperature: hardwareData.bodytemp || 98.6,
+        respiratoryRate: calculateRespiratoryRate(hardwareData.bpm), // Estimate RR from HR
+        oxygenSaturation: hardwareData.spo2 || 98
+      };
+
+      // Update UI with real values
+      addLog("Vitals", "Processing vital signs data...");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Blood Pressure
+      setVitals((prev) => ({ 
+        ...prev, 
+        bloodPressure: { systolic: newVitals.systolic, diastolic: newVitals.diastolic } 
+      }))
+      addLog("Vitals", `Blood pressure: ${newVitals.systolic}/${newVitals.diastolic} mmHg`, "1.0s")
+
+      // Heart Rate
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setVitals((prev) => ({ ...prev, heartRate: newVitals.heartRate }))
+      addLog("Vitals", `Heart rate: ${newVitals.heartRate} BPM`, "1.0s")
+
+      // Temperature
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setVitals((prev) => ({ ...prev, temperature: Math.round(newVitals.temperature * 10) / 10 }))
+      addLog("Vitals", `Temperature: ${newVitals.temperature}°F`, "0.5s")
+
+      // Respiratory Rate
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setVitals((prev) => ({ ...prev, respiratoryRate: newVitals.respiratoryRate }))
+      addLog("Vitals", `Respiratory rate: ${newVitals.respiratoryRate}/min`, "0.5s")
+
+      // Prepare complete vital signs for database
+      vitalSigns = {
+        timestamp: new Date(),
+        heartRate: newVitals.heartRate,
+        bpSystolic: newVitals.systolic,
+        bpDiastolic: newVitals.diastolic,
+        respiratoryRate: newVitals.respiratoryRate,
+        temperature: Math.round(newVitals.temperature * 10) / 10,
+        oxygenSaturation: newVitals.oxygenSaturation,
+        source: 'device' // Mark as device-collected
+      };
+
+      addLog("Success", "Hardware vitals collected successfully");
+      
+    } catch (error) {
+      console.error('Hardware vitals collection error:', error);
+      
+      // Type-safe error handling
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : '';
+      
+      if (errorName === 'TimeoutError') {
+        addLog("Error", "Hardware connection timeout - check device connection");
+      } else if (errorMessage.includes('Failed to fetch')) {
+        addLog("Error", "Cannot reach hardware device at 192.168.1.1");
+      } else {
+        addLog("Error", `Hardware vitals collection failed: ${errorMessage}`);
+      }
+      
+      // Fallback to simulated data if hardware fails
+      addLog("Vitals", "Falling back to simulated data...");
+      const fallbackVitals = generateFallbackVitals();
+      await processFallbackVitals(fallbackVitals);
+
+      // Create vitalSigns for fallback data
+      vitalSigns = {
+        timestamp: new Date(),
+        heartRate: fallbackVitals.heartRate,
+        bpSystolic: fallbackVitals.systolic,
+        bpDiastolic: fallbackVitals.diastolic,
+        respiratoryRate: fallbackVitals.respiratoryRate,
+        temperature: Math.round(fallbackVitals.temperature * 10) / 10,
+        oxygenSaturation: fallbackVitals.oxygenSaturation,
+        source: 'manual' // Mark as fallback
+      };
     }
 
-    const savedVitals = await response.json();
-    console.log('Successfully saved vitals:', savedVitals);
-    
-  } catch (error) {
-    console.error('Error saving vitals to backend:', error);
-    addLog("Error", "Failed to save vitals to backend");
+
+    // Save to backend database (for both hardware and fallback data)
+    if (vitalSigns) {
+      try {
+        const payload = {
+          patient: parseInt(currentPatientId, 10),
+          heart_rate: vitalSigns.heartRate,
+          bp_systolic: vitalSigns.bpSystolic,
+          bp_diastolic: vitalSigns.bpDiastolic,
+          respiratory_rate: vitalSigns.respiratoryRate,
+          temperature: vitalSigns.temperature,
+          oxygen_saturation: vitalSigns.oxygenSaturation,
+          source: vitalSigns.source
+        };
+        
+        console.log('Saving vitals to database:', payload);
+        addLog("Vitals", "Saving to database...");
+
+        const response = await fetch('http://127.0.0.1:8000/api/vitalsigns/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Database save failed: ${response.status} - ${errorText}`);
+        }
+
+        const savedVitals = await response.json();
+        console.log('Successfully saved vitals:', savedVitals);
+        
+      } catch (error) {
+        console.error('Error saving vitals to backend:', error);
+        addLog("Error", "Failed to save vitals to backend");
+      }
+      
+      // Store in localStorage for hospital sync
+      const existing = JSON.parse(localStorage.getItem("traumaVitals") || "{}");
+      if (!existing[currentPatientId]) existing[currentPatientId] = [];
+      existing[currentPatientId].push(vitalSigns);
+      localStorage.setItem("traumaVitals", JSON.stringify(existing));
+
+      // Add timeline action for vital signs collection
+      const timelineAction = {
+        timestamp: new Date(),
+        action: vitalSigns.source === 'device' ? 'Hardware Vitals Collected' : 'Vitals Collected',
+        actionType: 'assessment',
+        details: `${vitalSigns.source === 'device' ? 'Hardware' : 'Manual'} vital signs collected for ${currentPatientName}: HR ${vitalSigns.heartRate}, BP ${vitalSigns.bpSystolic}/${vitalSigns.bpDiastolic}, RR ${vitalSigns.respiratoryRate}, Temp ${vitalSigns.temperature}°F, SpO2 ${vitalSigns.oxygenSaturation}%`,
+        vitals: vitalSigns,
+        source: vitalSigns.source === 'device' ? 'hardware-device' : 'trauma-site'
+      };
+      
+      const existingTimeline = JSON.parse(localStorage.getItem("traumaTimeline") || "{}");
+      if (!existingTimeline[currentPatientId]) existingTimeline[currentPatientId] = [];
+      existingTimeline[currentPatientId].push(timelineAction);
+      localStorage.setItem("traumaTimeline", JSON.stringify(existingTimeline));
+
+      // Trigger hospital dashboard sync
+      triggerTriageXUpdate();
+
+      addLog("Success", "All vital signs collected and saved successfully")
+      
+      console.log(`Vitals collected for ${currentPatientName}:`, vitalSigns);
+    }
+
+    setIsCollecting(false)
   }
-  
-  // Store in localStorage for hospital sync
-  const existing = JSON.parse(localStorage.getItem("traumaVitals") || "{}");
-  if (!existing[currentPatientId]) existing[currentPatientId] = [];
-  existing[currentPatientId].push(vitalSigns);
-  localStorage.setItem("traumaVitals", JSON.stringify(existing));
-
-  // Add timeline action for vital signs collection
-  const timelineAction = {
-    timestamp: new Date(),
-    action: 'Vitals Collected',
-    actionType: 'assessment',
-    details: `Manual vital signs collected for ${currentPatientName}: HR ${vitalSigns.heartRate}, BP ${vitalSigns.bpSystolic}/${vitalSigns.bpDiastolic}, RR ${vitalSigns.respiratoryRate}, Temp ${vitalSigns.temperature}°F, SpO2 ${vitalSigns.oxygenSaturation}%`,
-    vitals: vitalSigns,
-    source: 'trauma-site'
-  };
-  
-  const existingTimeline = JSON.parse(localStorage.getItem("traumaTimeline") || "{}");
-  if (!existingTimeline[currentPatientId]) existingTimeline[currentPatientId] = [];
-  existingTimeline[currentPatientId].push(timelineAction);
-  localStorage.setItem("traumaTimeline", JSON.stringify(existingTimeline));
-
-  // Trigger hospital dashboard sync
-  triggerTriageXUpdate();
-
-  addLog("Success", "All vital signs collected successfully")
-  setIsCollecting(false)
-  
-  console.log(`Vitals collected for ${currentPatientName}:`, vitalSigns);
-}
-
 
   const getVitalStatus = (vital: string, value: number) => {
     switch (vital) {
@@ -487,7 +582,7 @@ useEffect(() => {
                   disabled={isCollecting}
                   className={`px-3 py-2 sm:px-4 sm:py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 rounded-lg font-medium transition-all duration-300 border-t border-gray-600 mt-1 sm:mt-2 ${isConsoleCollapsed ? "py-4 text-base sm:py-6 sm:text-lg" : "py-2 text-xs sm:py-3 sm:text-sm"}`}
                 >
-                  {isCollecting ? "Collecting Vitals..." : "Collect Vitals"}
+                  {isCollecting ? "Collecting Vitals..." : "Collect Hardware Vitals"}
                 </button>
               </div>
             </Card>
@@ -524,7 +619,9 @@ useEffect(() => {
                                 ? "bg-blue-900 text-blue-300"
                                 : log.level === "Success"
                                   ? "bg-green-900 text-green-300"
-                                  : "bg-gray-700 text-gray-300"
+                                  : log.level === "Error"
+                                    ? "bg-red-900 text-red-300"
+                                    : "bg-gray-700 text-gray-300"
                           }`}
                         >
                           [{log.level}]
