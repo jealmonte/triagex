@@ -139,11 +139,13 @@ const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Critical': return 'bg-red-900 text-red-300 border-red-700';
-      case 'Stable': return 'bg-green-900 text-green-300 border-green-700';
-      case 'Improving': return 'bg-blue-900 text-blue-300 border-blue-700';
+      case 'Stable': return 'bg-yellow-900 text-yellow-300 border-yellow-700';  // Changed from green
+      case 'Improving': return 'bg-green-900 text-green-300 border-green-700';  // Changed from blue
+      case 'Deceased': return 'bg-gray-900 text-gray-300 border-gray-700';
       default: return 'bg-gray-900 text-gray-300 border-gray-700';
     }
   };
+
 
   const getVitalStatus = (value: number, range: { min: number; max: number }): string => {
     if (!value || value === 0) return 'unknown';

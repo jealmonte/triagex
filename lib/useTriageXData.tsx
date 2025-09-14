@@ -107,10 +107,10 @@ const convertToHospitalFormat = (
   patients: TraumaSitePatientWithVitals[]
 ): HospitalPatientData[] => {
   const getStatusFromTriage = (triageLevel: string): HospitalPatientInfo['status'] => {
-    switch (triageLevel) {
+    switch (triageLevel.toLowerCase()) {
       case 'red': return 'Critical';
-      case 'yellow': return 'Stable';
-      case 'green': return 'Improving';
+      case 'yellow': return 'Stable';  // Changed from 'Urgent' to match your system
+      case 'green': return 'Improving'; // Changed from 'Minor' to match your system
       case 'black': return 'Deceased';
       default: return 'Stable';
     }

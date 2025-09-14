@@ -28,81 +28,214 @@ export interface TriageResult {
   score: number;
   reasoning: string[];
   shockIndex?: number;
+  injurySeverityScore?: number;
 }
 
 export class TriageClassifier {
   
+  // Critical injury patterns that warrant immediate red triage
+  private criticalInjuryPatterns = [
+    'head injury', 'brain injury', 'skull fracture', 'traumatic brain injury',
+    'chest injury', 'pneumothorax', 'hemothorax', 'flail chest',
+    'abdominal injury', 'internal bleeding', 'abdominal trauma',
+    'spinal injury', 'spinal cord injury', 'neck injury',
+    'massive bleeding', 'hemorrhage', 'arterial bleeding',
+    'amputation', 'severed limb', 'major amputation',
+    'multiple fractures', 'pelvic fracture', 'femur fracture'
+  ];
+
+  // High-energy mechanisms that increase injury severity
+  private highEnergyMechanisms = [
+    'motor vehicle accident', 'car accident', 'motorcycle accident',
+    'fall from height', 'high speed collision', 'rollover',
+    'gunshot', 'gsw', 'shooting', 'bullet wound',
+    'stabbing', 'knife wound', 'penetrating trauma',
+    'explosion', 'blast injury', 'crush injury',
+    'hit by vehicle', 'pedestrian struck'
+  ];
+
   /**
-   * Calculate shock index (Heart Rate / Systolic BP)
-   * Normal: 0.5-0.7
-   * Concerning: 0.7-1.0  
-   * Critical: >1.0
+   * Calculate shock index with injury consideration
+   * Traditional: SI = HR/SBP
+   * Enhanced: Adjusts for injury patterns
    */
-  private calculateShockIndex(heartRate: number, systolicBP: number): number {
-    if (!heartRate || !systolicBP || systolicBP === 0) return 0;
-    return heartRate / systolicBP;
+  private calculateEnhancedShockIndex(factors: TriageFactors): number {
+    if (!factors.heartRate || !factors.systolicBP || factors.systolicBP === 0) {
+      return 0;
+    }
+    
+    let baseShockIndex = factors.heartRate / factors.systolicBP;
+    
+    // Adjust shock index based on injury patterns
+    let injuryMultiplier = 1.0;
+    
+    if (factors.visibleInjuries && factors.selectedInjuries?.length) {
+      const criticalInjuryCount = factors.selectedInjuries.filter(injury => 
+        this.criticalInjuryPatterns.some(pattern => 
+          injury.toLowerCase().includes(pattern.toLowerCase())
+        )
+      ).length;
+      
+      // Each critical injury increases the effective shock index
+      injuryMultiplier += (criticalInjuryCount * 0.2);
+      
+      // Multiple injuries compound the effect
+      if (factors.selectedInjuries.length > 3) {
+        injuryMultiplier += 0.3;
+      }
+    }
+    
+    // High-energy mechanism increases shock index interpretation
+    if (factors.mechanism) {
+      const isHighEnergy = this.highEnergyMechanisms.some(mech => 
+        factors.mechanism?.toLowerCase().includes(mech.toLowerCase())
+      );
+      if (isHighEnergy) {
+        injuryMultiplier += 0.25;
+      }
+    }
+    
+    return baseShockIndex * injuryMultiplier;
   }
 
   /**
-   * Score vital signs based on normal ranges
+   * Calculate injury severity score based on anatomical regions and patterns
+   */
+  private calculateInjurySeverity(factors: TriageFactors): { score: number; reasons: string[] } {
+    let score = 0;
+    const reasons: string[] = [];
+    
+    if (!factors.visibleInjuries || !factors.selectedInjuries?.length) {
+      return { score: 0, reasons: ['No visible injuries reported'] };
+    }
+    
+    // Categorize injuries by severity and body region
+    const injuryCategories = {
+      critical: { count: 0, regions: new Set() },
+      severe: { count: 0, regions: new Set() },
+      moderate: { count: 0, regions: new Set() }
+    };
+    
+    factors.selectedInjuries.forEach(injury => {
+      const injuryLower = injury.toLowerCase();
+      
+      // Critical injuries (6-9 points each)
+      if (this.criticalInjuryPatterns.some(pattern => injuryLower.includes(pattern))) {
+        injuryCategories.critical.count++;
+        score += 7;
+        
+        // Identify body region
+        if (injuryLower.includes('head') || injuryLower.includes('brain') || injuryLower.includes('skull')) {
+          injuryCategories.critical.regions.add('head');
+        } else if (injuryLower.includes('chest') || injuryLower.includes('thorax')) {
+          injuryCategories.critical.regions.add('chest');
+        } else if (injuryLower.includes('abdom') || injuryLower.includes('pelv')) {
+          injuryCategories.critical.regions.add('abdomen');
+        } else if (injuryLower.includes('spin') || injuryLower.includes('neck')) {
+          injuryCategories.critical.regions.add('spine');
+        }
+        
+        reasons.push(`Critical injury: ${injury}`);
+      }
+      // Severe injuries (3-5 points each)
+      else if (injuryLower.includes('fracture') || injuryLower.includes('dislocation') || 
+               injuryLower.includes('severe') || injuryLower.includes('deep laceration')) {
+        injuryCategories.severe.count++;
+        score += 4;
+        reasons.push(`Severe injury: ${injury}`);
+      }
+      // Moderate injuries (1-2 points each)
+      else {
+        injuryCategories.moderate.count++;
+        score += 1;
+        reasons.push(`Moderate injury: ${injury}`);
+      }
+    });
+    
+    // Multiple body system involvement increases severity
+    const totalRegions = injuryCategories.critical.regions.size + 
+                         injuryCategories.severe.regions.size;
+    
+    if (totalRegions >= 3) {
+      score += 5;
+      reasons.push('Multiple body systems involved');
+    } else if (totalRegions >= 2) {
+      score += 3;
+      reasons.push('Multiple body regions affected');
+    }
+    
+    // Polytrauma bonus (multiple severe injuries)
+    if (injuryCategories.critical.count >= 2) {
+      score += 4;
+      reasons.push('Multiple critical injuries (polytrauma)');
+    } else if (injuryCategories.critical.count + injuryCategories.severe.count >= 3) {
+      score += 2;
+      reasons.push('Multiple significant injuries');
+    }
+    
+    return { score: Math.min(score, 25), reasons }; // Cap at 25
+  }
+
+  /**
+   * Enhanced vital signs scoring with injury context
    */
   private scoreVitalSigns(factors: TriageFactors): { score: number; reasons: string[] } {
     let score = 0;
     const reasons: string[] = [];
 
-    // Heart Rate scoring
+    // Calculate enhanced shock index
+    const enhancedSI = this.calculateEnhancedShockIndex(factors);
+    
+    if (enhancedSI > 0) {
+      if (enhancedSI > 1.3) {
+        score += 6;
+        reasons.push(`Critical enhanced shock index: ${enhancedSI.toFixed(2)}`);
+      } else if (enhancedSI > 1.0) {
+        score += 4;
+        reasons.push(`High enhanced shock index: ${enhancedSI.toFixed(2)}`);
+      } else if (enhancedSI > 0.8) {
+        score += 2;
+        reasons.push(`Elevated enhanced shock index: ${enhancedSI.toFixed(2)}`);
+      }
+    }
+
+    // Traditional vital signs scoring
     if (factors.heartRate) {
       if (factors.heartRate > 120 || factors.heartRate < 50) {
         score += 3;
         reasons.push(`Critical heart rate: ${factors.heartRate} BPM`);
       } else if (factors.heartRate > 100 || factors.heartRate < 60) {
-        score += 2;
+        score += 1;
         reasons.push(`Abnormal heart rate: ${factors.heartRate} BPM`);
       }
     }
 
-    // Blood Pressure scoring
-    if (factors.systolicBP && factors.diastolicBP) {
-      if (factors.systolicBP < 90 || factors.systolicBP > 180) {
-        score += 3;
-        reasons.push(`Critical systolic BP: ${factors.systolicBP} mmHg`);
-      } else if (factors.systolicBP < 110 || factors.systolicBP > 140) {
-        score += 1;
-        reasons.push(`Concerning systolic BP: ${factors.systolicBP} mmHg`);
-      }
-
-      if (factors.diastolicBP > 110 || factors.diastolicBP < 60) {
+    if (factors.systolicBP) {
+      if (factors.systolicBP < 90) {
+        score += 4;
+        reasons.push(`Hypotension: ${factors.systolicBP} mmHg`);
+      } else if (factors.systolicBP < 110) {
         score += 2;
-        reasons.push(`Abnormal diastolic BP: ${factors.diastolicBP} mmHg`);
+        reasons.push(`Low systolic BP: ${factors.systolicBP} mmHg`);
+      } else if (factors.systolicBP > 180) {
+        score += 2;
+        reasons.push(`Severe hypertension: ${factors.systolicBP} mmHg`);
       }
     }
 
-    // Respiratory Rate scoring
     if (factors.respiratoryRate) {
       if (factors.respiratoryRate > 30 || factors.respiratoryRate < 8) {
         score += 3;
         reasons.push(`Critical respiratory rate: ${factors.respiratoryRate}/min`);
       } else if (factors.respiratoryRate > 24 || factors.respiratoryRate < 12) {
-        score += 2;
+        score += 1;
         reasons.push(`Abnormal respiratory rate: ${factors.respiratoryRate}/min`);
       }
     }
 
-    // Temperature scoring
-    if (factors.temperature) {
-      if (factors.temperature > 103 || factors.temperature < 95) {
-        score += 3;
-        reasons.push(`Critical temperature: ${factors.temperature}°F`);
-      } else if (factors.temperature > 100.4 || factors.temperature < 97) {
-        score += 1;
-        reasons.push(`Abnormal temperature: ${factors.temperature}°F`);
-      }
-    }
-
-    // Oxygen Saturation scoring
     if (factors.oxygenSaturation) {
       if (factors.oxygenSaturation < 90) {
-        score += 3;
+        score += 4;
         reasons.push(`Critical oxygen saturation: ${factors.oxygenSaturation}%`);
       } else if (factors.oxygenSaturation < 95) {
         score += 2;
@@ -114,66 +247,41 @@ export class TriageClassifier {
   }
 
   /**
-   * Score questionnaire responses
+   * Score consciousness and mechanism with injury correlation
    */
-  private scoreQuestionnaire(factors: TriageFactors): { score: number; reasons: string[] } {
+  private scoreConsciousnessAndMechanism(factors: TriageFactors): { score: number; reasons: string[] } {
     let score = 0;
     const reasons: string[] = [];
 
-    // Consciousness level
+    // Consciousness scoring
     if (factors.consciousness) {
-      switch (factors.consciousness.toLowerCase()) {
-        case 'unconscious':
-        case 'unresponsive':
-          score += 4;
-          reasons.push('Patient unconscious/unresponsive');
-          break;
-        case 'confused':
-        case 'disoriented':
-          score += 2;
-          reasons.push('Altered consciousness');
-          break;
-        case 'drowsy':
-          score += 1;
-          reasons.push('Decreased alertness');
-          break;
+      const consciousnessLower = factors.consciousness.toLowerCase();
+      if (consciousnessLower.includes('unconscious') || 
+          consciousnessLower.includes('unresponsive') ||
+          consciousnessLower.includes('coma')) {
+        score += 8;
+        reasons.push('Patient unconscious/unresponsive');
+      } else if (consciousnessLower.includes('confused') || 
+                 consciousnessLower.includes('disoriented') ||
+                 consciousnessLower.includes('altered')) {
+        score += 4;
+        reasons.push('Altered level of consciousness');
+      } else if (consciousnessLower.includes('drowsy') || 
+                 consciousnessLower.includes('lethargic')) {
+        score += 2;
+        reasons.push('Decreased alertness');
       }
     }
 
-    // Mechanism of injury
+    // High-energy mechanism scoring
     if (factors.mechanism) {
-      const highEnergyMechanisms = ['motor vehicle accident', 'fall from height', 'gunshot', 'stabbing', 'explosion'];
-      if (highEnergyMechanisms.some(mech => factors.mechanism?.toLowerCase().includes(mech))) {
-        score += 2;
-        reasons.push('High-energy mechanism of injury');
-      }
-    }
-
-    // Visible injuries
-    if (factors.visibleInjuries && factors.selectedInjuries?.length) {
-      const criticalInjuries = ['head injury', 'chest injury', 'abdominal injury', 'multiple fractures'];
-      const criticalCount = factors.selectedInjuries.filter(injury => 
-        criticalInjuries.some(critical => injury.toLowerCase().includes(critical))
-      ).length;
-
-      if (criticalCount >= 2) {
+      const isHighEnergy = this.highEnergyMechanisms.some(mech => 
+        factors.mechanism?.toLowerCase().includes(mech.toLowerCase())
+      );
+      
+      if (isHighEnergy) {
         score += 3;
-        reasons.push('Multiple critical injuries identified');
-      } else if (criticalCount === 1) {
-        score += 2;
-        reasons.push('Critical injury identified');
-      } else if (factors.selectedInjuries.length > 3) {
-        score += 1;
-        reasons.push('Multiple injuries present');
-      }
-    }
-
-    // Chief complaint
-    if (factors.chiefComplaint) {
-      const criticalComplaints = ['chest pain', 'difficulty breathing', 'severe bleeding', 'loss of consciousness'];
-      if (criticalComplaints.some(complaint => factors.chiefComplaint?.toLowerCase().includes(complaint))) {
-        score += 2;
-        reasons.push('Critical chief complaint');
+        reasons.push(`High-energy mechanism: ${factors.mechanism}`);
       }
     }
 
@@ -181,103 +289,103 @@ export class TriageClassifier {
   }
 
   /**
-   * Score paramedic actions performed
+   * Score paramedic actions (indicates complexity/severity)
    */
-  private scoreActions(factors: TriageFactors): { score: number; reasons: string[] } {
+  private scoreParamedicActions(factors: TriageFactors): { score: number; reasons: string[] } {
     let score = 0;
     const reasons: string[] = [];
 
-    // Emergency actions indicate severity
     if (factors.emergencyActionCount && factors.emergencyActionCount > 0) {
-      score += factors.emergencyActionCount * 2;
-      reasons.push(`${factors.emergencyActionCount} emergency interventions performed`);
+      score += factors.emergencyActionCount * 3;
+      reasons.push(`${factors.emergencyActionCount} emergency intervention(s) performed`);
     }
 
-    // Multiple actions suggest complex case
+    if (factors.medicationCount && factors.medicationCount > 0) {
+      score += factors.medicationCount * 2;
+      reasons.push(`${factors.medicationCount} medication(s) administered`);
+    }
+
     if (factors.actionCount && factors.actionCount > 5) {
       score += 2;
       reasons.push('Multiple interventions required');
-    } else if (factors.actionCount && factors.actionCount > 3) {
-      score += 1;
-      reasons.push('Several interventions performed');
-    }
-
-    // Medications given
-    if (factors.medicationCount && factors.medicationCount > 0) {
-      score += factors.medicationCount;
-      reasons.push(`${factors.medicationCount} medications administered`);
     }
 
     return { score, reasons };
   }
 
   /**
-   * Main triage classification function
+   * Main enhanced triage classification
    */
   public classify(factors: TriageFactors): TriageResult {
     const allReasons: string[] = [];
     let totalScore = 0;
 
-    // Calculate shock index
-    let shockIndex = 0;
-    if (factors.heartRate && factors.systolicBP) {
-      shockIndex = this.calculateShockIndex(factors.heartRate, factors.systolicBP);
-      
-      if (shockIndex > 1.0) {
-        totalScore += 4;
-        allReasons.push(`Critical shock index: ${shockIndex.toFixed(2)} (>1.0)`);
-      } else if (shockIndex > 0.9) {
-        totalScore += 3;
-        allReasons.push(`High shock index: ${shockIndex.toFixed(2)} (>0.9)`);
-      } else if (shockIndex > 0.7) {
-        totalScore += 2;
-        allReasons.push(`Elevated shock index: ${shockIndex.toFixed(2)} (>0.7)`);
-      }
-    }
+    // Calculate injury severity score (most important factor)
+    const injuryScore = this.calculateInjurySeverity(factors);
+    totalScore += injuryScore.score * 1.5; // Weight injuries heavily
+    allReasons.push(...injuryScore.reasons);
 
-    // Score vital signs
+    // Calculate vital signs score
     const vitalScore = this.scoreVitalSigns(factors);
     totalScore += vitalScore.score;
     allReasons.push(...vitalScore.reasons);
 
-    // Score questionnaire
-    const questionnaireScore = this.scoreQuestionnaire(factors);
-    totalScore += questionnaireScore.score;
-    allReasons.push(...questionnaireScore.reasons);
+    // Calculate consciousness and mechanism score
+    const consciousnessScore = this.scoreConsciousnessAndMechanism(factors);
+    totalScore += consciousnessScore.score;
+    allReasons.push(...consciousnessScore.reasons);
 
-    // Score actions
-    const actionScore = this.scoreActions(factors);
+    // Calculate paramedic actions score
+    const actionScore = this.scoreParamedicActions(factors);
     totalScore += actionScore.score;
     allReasons.push(...actionScore.reasons);
 
-    // Determine triage level based on total score
-    let level: TriageLevel;
-    if (totalScore >= 10) {
-      level = 'red';
-    } else if (totalScore >= 6) {
-      level = 'yellow';
-    } else if (totalScore >= 1) {
-      level = 'green';
-    } else {
-      level = 'green'; // Default to green for minimal/no concerns
-    }
+    // Calculate enhanced shock index
+    const enhancedShockIndex = this.calculateEnhancedShockIndex(factors);
 
-    // Override logic for critical situations
-    if (factors.consciousness === 'unconscious' || 
+    // Determine triage level based on total score and critical factors
+    let level: TriageLevel = 'green';
+    
+    // Critical overrides (immediate red triage)
+    if (factors.consciousness?.toLowerCase().includes('unconscious') ||
+        factors.consciousness?.toLowerCase().includes('unresponsive') ||
         (factors.oxygenSaturation && factors.oxygenSaturation < 85) ||
         (factors.systolicBP && factors.systolicBP < 70) ||
-        (shockIndex > 1.2)) {
+        enhancedShockIndex > 1.4) {
       level = 'red';
-      if (!allReasons.includes('Critical condition detected')) {
-        allReasons.unshift('Critical condition detected');
+      allReasons.unshift('Critical condition detected - immediate intervention required');
+    }
+    // Score-based triage levels
+    else if (totalScore >= 15 || enhancedShockIndex > 1.0) {
+      level = 'red';
+    } else if (totalScore >= 8 || enhancedShockIndex > 0.8) {
+      level = 'yellow';
+    } else if (totalScore >= 3) {
+      level = 'green';
+    }
+
+    // Special case: Multiple critical injuries always red
+    if (factors.selectedInjuries && factors.selectedInjuries.length > 0) {
+      const criticalInjuryCount = factors.selectedInjuries.filter(injury => 
+        this.criticalInjuryPatterns.some(pattern => 
+          injury.toLowerCase().includes(pattern.toLowerCase())
+        )
+      ).length;
+      
+      if (criticalInjuryCount >= 2) {
+        level = 'red';
+        if (!allReasons.some(r => r.includes('Critical condition'))) {
+          allReasons.unshift('Multiple critical injuries - immediate care required');
+        }
       }
     }
 
     return {
       level,
-      score: totalScore,
-      reasoning: allReasons.length > 0 ? allReasons : ['Standard triage assessment'],
-      shockIndex: shockIndex > 0 ? shockIndex : undefined
+      score: Math.round(totalScore * 10) / 10,
+      reasoning: allReasons.length > 0 ? allReasons : ['Standard assessment - no critical findings'],
+      shockIndex: enhancedShockIndex > 0 ? Math.round(enhancedShockIndex * 100) / 100 : undefined,
+      injurySeverityScore: injuryScore.score
     };
   }
 }
