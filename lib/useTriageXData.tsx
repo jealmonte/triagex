@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { TriageLevel, TriageResult } from '@/lib/triageAlgorithm';
 
 // TypeScript interfaces matching your trauma site data structure
 interface TraumaSite {
@@ -38,6 +39,16 @@ interface TraumaSitePatientWithVitals extends TraumaSitePatient {
   gender?: string;
   chiefComplaint?: string;
   eta?: number;
+}
+
+interface PatientWithTriage extends TraumaSitePatient {
+  triageResult?: TriageResult;
+  manualTriageOverride?: {
+    level: TriageLevel;
+    timestamp: Date;
+    reason?: string;
+    overriddenBy?: string;
+  };
 }
 
 // Hospital dashboard interfaces

@@ -9,6 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, MapPin, Battery, Users, Clock, X, Monitor, Activity, AlertTriangle, Heart, Droplets, Wind, CircuitBoard, Brain, Zap } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { api, type TraumaSiteDTO, type PatientDTO } from "@/lib/api"
+import { TriageBadge } from '@/components/TriageBadge';
+import { triageService } from '@/lib/triageService';
+import { TriageLevel, TriageResult } from '@/lib/triageAlgorithm';
+
 
 // Extract the payload type from createPatient's first parameter
 type CreatePatientPayload = Parameters<typeof api.createPatient>[0];
@@ -86,6 +90,8 @@ interface PatientCreateUpdatePayload {
 }
 
 
+
+
 export default function TraumaSitePage() {
   const router = useRouter()
 
@@ -98,6 +104,8 @@ export default function TraumaSitePage() {
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [showPatientActions, setShowPatientActions] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [triageResults, setTriageResults] = useState<Record<string, TriageResult>>({});
+  const [manualOverrides, setManualOverrides] = useState<Record<string, any>>({});
   const [patientInfo, setPatientInfo] = useState<PatientInfo>({
     name: "",
     age: 0,
@@ -692,6 +700,51 @@ const handlePatientInfoSubmit = async () => {
     // eslint-disable-next-line
   }, []);
 
+  useEffect(() => {
+  // Load manual overrides
+  const overrides = JSON.parse(localStorage.getItem('triageOverrides') || '{}');
+  setManualOverrides(overrides);
+
+  // Recalculate triage for all patients
+  const recalculateAllTriage = async () => {
+  const results: Record<string, TriageResult> = {};
+  
+  for (const patient of patients) {
+    try {
+      // Convert patient.id to string using String() constructor
+      results[String(patient.id)] = await triageService.recalculatePatientTriage(String(patient.id));
+    } catch (error) {
+      console.error(`Error calculating triage for patient ${patient.id}:`, error);
+    }
+  }
+  
+  setTriageResults(results);
+};
+
+  recalculateAllTriage();
+}, [patients]);
+
+const handleTriageLevelChange = async (patientId: string, newLevel: TriageLevel, isManualOverride: boolean) => {
+  if (isManualOverride) {
+    try {
+      await triageService.applyTriageOverride(patientId, newLevel);
+      
+      // Update local state
+      setManualOverrides(prev => ({
+        ...prev,
+        [patientId]: {
+          level: newLevel,
+          timestamp: new Date(),
+          reason: 'Manual override by medical personnel'
+        }
+      }));
+    } catch (error) {
+      console.error('Failed to apply triage override:', error);
+      alert('Failed to update triage level. Please try again.');
+    }
+  }
+};
+
   // Fetch patients for the selected trauma site from the backend DB
   useEffect(() => {
     async function reloadPatients() {
@@ -986,11 +1039,18 @@ const handlePatientInfoSubmit = async () => {
                         <div className="flex-1">
                           <h3 className="font-semibold text-white">{patient.name}</h3>
                           <div className="flex items-center gap-2 mt-2">
-                            <Badge className={getTriageColor(patient.triageLevel)}>
-                              {patient.triageLevel.toUpperCase()}
-                            </Badge>
-                            <span className="text-sm text-gray-400">{patient.triageStatus}</span>
-                          </div>
+                          <TriageBadge
+                            currentLevel={manualOverrides[patient.id]?.level || triageResults[patient.id]?.level || patient.triageLevel}
+                            triageResult={triageResults[patient.id]}
+                            patientId={String(patient.id)}
+                            patientName={patient.name}
+                            onLevelChange={(newLevel, isManualOverride) => 
+                              handleTriageLevelChange(String(patient.id), newLevel, isManualOverride)
+                            }
+                            isManualOverride={!!manualOverrides[patient.id]}
+                          />
+                          <span className="text-sm text-gray-400">{patient.triageStatus}</span>
+                        </div>
                           <div className="flex items-center gap-1 mt-1 text-sm text-gray-500">
                             <Clock className="w-4 h-4" />
                             <span>{patient.createdAt.toLocaleTimeString()}</span>
@@ -1307,9 +1367,16 @@ const handlePatientInfoSubmit = async () => {
               <div className="grid grid-cols-4 gap-4 p-4 bg-black/40 rounded-lg mb-6">
                 <div className="text-center">
                   <p className="text-sm text-gray-400">Triage Level</p>
-                  <Badge className={getTriageColor(selectedPatient.triageLevel)}>
-                    {selectedPatient.triageLevel.toUpperCase()}
-                  </Badge>
+                  <TriageBadge
+                    currentLevel={manualOverrides[selectedPatient.id]?.level || triageResults[selectedPatient.id]?.level || selectedPatient.triageLevel}
+                    triageResult={triageResults[selectedPatient.id]}
+                    patientId={String(selectedPatient.id)}
+                    patientName={selectedPatient.name}
+                    onLevelChange={(newLevel, isManualOverride) => 
+                      handleTriageLevelChange(String(selectedPatient.id), newLevel, isManualOverride)
+                    }
+                    isManualOverride={!!manualOverrides[selectedPatient.id]}
+                  />
                 </div>
                 <div className="text-center">
                   <p className="text-sm text-gray-400">Status</p>
